@@ -1,0 +1,135 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Curve Control - Authentication",
+        "description": "Enter your credentials. Provide an email address to create a new account, or leave it blank to log in.",
+        "data": {
+          "username": "Username",
+          "password": "Password",
+          "email": "Email (optional - for new accounts only)"
+        },
+        "data_description": {
+          "username": "Your Curve Control username (3-50 characters)",
+          "password": "Your password (minimum 8 characters)",
+          "email": "Email address - only provide if creating a new account"
+        }
+      },
+      "preferences": {
+        "title": "Configure Curve Control Energy Optimizer",
+        "description": "Set up your Curve Control integration to optimize HVAC usage based on time-of-use electricity rates.",
+        "data": {
+          "thermostat_entity": "Thermostat",
+          "home_size": "Home Size",
+          "target_temperature": "Target Temperature",
+          "location": "Utility Rate Plan",
+          "time_away": "Away Time",
+          "time_home": "Home Time",
+          "savings_level": "Savings Preference",
+          "weather_entity": "Weather Provider"
+        },
+        "data_description": {
+          "thermostat_entity": "Select the thermostat to control",
+          "home_size": "Square footage of your home",
+          "target_temperature": "Your preferred base temperature",
+          "location": "Select your utility provider and rate plan",
+          "time_away": "Time you typically leave home",
+          "time_home": "Time you typically return home",
+          "savings_level": "How aggressive should the optimization be?",
+          "weather_entity": "Weather provider for forecast data"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the backend service",
+      "invalid_response": "Invalid response from backend service",
+      "invalid_auth": "Authentication failed. Check your username and password.",
+      "unknown": "Unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "This configuration already exists",
+      "reconfigure_successful": "Successfully reconfigured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Curve Control Options",
+        "description": "Adjust your energy optimization settings",
+        "data": {
+          "home_size": "Home Size",
+          "target_temperature": "Target Temperature",
+          "time_away": "Away Time",
+          "time_home": "Home Time",
+          "savings_level": "Savings Preference"
+        }
+      }
+    }
+  },
+  "entity": {
+    "climate": {
+      "curve_control_thermostat": {
+        "name": "Optimized Thermostat"
+      }
+    },
+    "sensor": {
+      "curve_control_savings": {
+        "name": "Energy Savings"
+      },
+      "curve_control_co2_avoided": {
+        "name": "CO2 Avoided"
+      },
+      "curve_control_status": {
+        "name": "Optimization Status"
+      },
+      "curve_control_next_setpoint": {
+        "name": "Next Temperature Setpoint"
+      },
+      "curve_control_current_interval": {
+        "name": "Current Time Interval"
+      }
+    }
+  },
+  "services": {
+    "update_schedule": {
+      "name": "Update Schedule",
+      "description": "Update the optimization schedule with new parameters",
+      "fields": {
+        "home_size": {
+          "name": "Home Size",
+          "description": "Square footage of the home"
+        },
+        "savings_level": {
+          "name": "Savings Level",
+          "description": "Optimization aggressiveness (1=Low, 2=Medium, 3=High)"
+        },
+        "time_away": {
+          "name": "Away Time",
+          "description": "Time when you leave home (HH:MM format)"
+        },
+        "time_home": {
+          "name": "Home Time",
+          "description": "Time when you return home (HH:MM format)"
+        }
+      }
+    },
+    "force_optimization": {
+      "name": "Force Optimization",
+      "description": "Force an immediate optimization calculation"
+    },
+    "update_rates": {
+      "name": "Update Learning Rates",
+      "description": "Update the heat-up and cool-down learning rates",
+      "fields": {
+        "heat_up_rate": {
+          "name": "Heat Up Rate",
+          "description": "Temperature rise per 30 minutes when heating/AC off"
+        },
+        "cool_down_rate": {
+          "name": "Cool Down Rate",
+          "description": "Temperature drop per 30 minutes when cooling/AC on"
+        }
+      }
+    }
+  }
+}

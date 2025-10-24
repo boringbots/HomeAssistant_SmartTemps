@@ -1,0 +1,13 @@
+{
+  "domain": "curve_control",
+  "name": "Curve Control Energy Optimizer",
+  "codeowners": ["@boringbots"],
+  "config_flow": true,
+  "dependencies": ["http"],
+  "documentation": "https://github.com/boringbots/HomeAssistant_SmartTemps",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/boringbots/HomeAssistant_SmartTemps/issues",
+  "requirements": ["aiohttp>=3.8.0", "python-dateutil>=2.8.0"],
+  "version": "2.0.0"
+}

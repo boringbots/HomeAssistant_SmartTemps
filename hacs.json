@@ -1,0 +1,10 @@
+{
+  "name": "Curve Control Energy Optimizer",
+  "content_in_root": false,
+  "zip_release": false,
+  "filename": "curve_control",
+  "country": ["US"],
+  "domains": ["climate", "sensor", "switch"],
+  "iot_class": "Cloud Polling",
+  "render_readme": true
+}
