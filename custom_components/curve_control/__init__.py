@@ -144,8 +144,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Register services
     async def handle_update_schedule(call):
-        """Handle schedule update service call."""
+        """Handle schedule update service call - updates config and saves to database."""
+        # First update the local config with new settings
         await coordinator.async_update_schedule(call.data)
+        # Then save preferences to database for nightly runs
+        await coordinator.async_optimize_and_save(immediate=True)
 
     async def handle_force_optimization(call):
         """Handle force optimization service call."""
