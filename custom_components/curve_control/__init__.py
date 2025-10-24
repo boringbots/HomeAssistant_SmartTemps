@@ -145,10 +145,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register services
     async def handle_update_schedule(call):
         """Handle schedule update service call - updates config and saves to database."""
-        # First update the local config with new settings
-        await coordinator.async_update_schedule(call.data)
-        # Then save preferences to database for nightly runs
-        await coordinator.async_optimize_and_save(immediate=True)
+        await coordinator.async_update_schedule(call.data, save_to_db=True)
 
     async def handle_force_optimization(call):
         """Handle force optimization service call."""
@@ -367,11 +364,11 @@ class CurveControlCoordinator(DataUpdateCoordinator):
             _LOGGER.error(f"Coordinator optimization error: {err}")
             raise UpdateFailed(f"Unexpected error: {err}")
     
-    async def async_update_schedule(self, data: dict[str, Any]) -> None:
+    async def async_update_schedule(self, data: dict[str, Any], save_to_db: bool = False) -> None:
         """Update the schedule configuration and trigger immediate optimization."""
         _LOGGER.info("User updated preferences - triggering optimization")
         _LOGGER.info(f"DEBUG: Received service call data: {data}")
-        
+
         # Update configuration from frontend data
         if "homeSize" in data:
             self.config["homeSize"] = data["homeSize"]
@@ -387,7 +384,7 @@ class CurveControlCoordinator(DataUpdateCoordinator):
         if "timeHome" in data:
             # Ensure time is in HH:MM format - let it fail if format is wrong
             self.config["timeHome"] = str(data["timeHome"])[:5]
-        
+
         # Store custom temperature schedule if provided (for detailed mode)
         if "temperatureSchedule" in data:
             self._custom_temperature_schedule = data["temperatureSchedule"]
@@ -395,11 +392,16 @@ class CurveControlCoordinator(DataUpdateCoordinator):
         else:
             # Clear custom schedule for basic mode
             self._custom_temperature_schedule = None
-        
+
         _LOGGER.info(f"DEBUG: Updated config after service call: {self.config}")
-        
+
         # Trigger immediate optimization
         await self.async_request_refresh()
+
+        # Save to database if requested (for Apply Settings and Apply Custom Schedule buttons)
+        if save_to_db and self.user_id and self.auth_token:
+            _LOGGER.info("Saving updated preferences to database")
+            await self._save_preferences_to_db()
     
     async def force_optimization(self) -> None:
         """Force immediate optimization."""
@@ -484,6 +486,83 @@ class CurveControlCoordinator(DataUpdateCoordinator):
             return None
 
         return (self.schedule_data[1], self.schedule_data[2])  # high, low bounds
+
+    async def _save_preferences_to_db(self) -> None:
+        """Save current preferences and optimization results to database (without re-running optimization)."""
+        try:
+            # Get weather forecast if available
+            weather_forecast = None
+            weather_entity = self.entry.data.get(CONF_WEATHER_ENTITY)
+            if weather_entity:
+                weather_state = self.hass.states.get(weather_entity)
+                if weather_state:
+                    forecast_data = []
+                    try:
+                        forecast_response = await self.hass.services.async_call(
+                            "weather",
+                            "get_forecasts",
+                            {"entity_id": weather_entity, "type": "hourly"},
+                            blocking=True,
+                            return_response=True,
+                        )
+                        if forecast_response and weather_entity in forecast_response:
+                            forecast_data = forecast_response[weather_entity].get("forecast", [])[:24]
+                    except Exception as e:
+                        _LOGGER.warning(f"Could not fetch hourly forecast: {e}")
+
+                    weather_forecast = {
+                        "condition": weather_state.state,
+                        "temperature": weather_state.attributes.get("temperature"),
+                        "humidity": weather_state.attributes.get("humidity"),
+                        "forecast": forecast_data,
+                    }
+
+            # Build temperature schedule
+            if self._custom_temperature_schedule:
+                schedule_data = self._custom_temperature_schedule
+            else:
+                schedule_data = self._build_30min_temperature_schedule()
+
+            # Prepare preferences payload
+            preferences = {
+                "home_size": self.config["homeSize"],
+                "base_temperature": self.config["homeTemperature"],
+                "target_temperature": self.config["homeTemperature"],
+                "location": self.config["location"],
+                "savings_level": self.config["savingsLevel"],
+                "time_away": self.config["timeAway"],
+                "time_home": self.config["timeHome"],
+                "high_temperatures": schedule_data.get("highTemperatures"),
+                "low_temperatures": schedule_data.get("lowTemperatures"),
+                "heating_rate": self.heat_up_rate if self.thermal_learning else None,
+                "cooling_rate": self.cool_down_rate if self.thermal_learning else None,
+                "natural_rate": self.heat_up_rate if self.thermal_learning else None,
+            }
+
+            # Call save-preferences edge function (WITHOUT immediate optimization since we already ran it)
+            payload = {
+                "user_id": self.user_id,
+                "preferences": preferences,
+                "weather_forecast": weather_forecast,
+                "immediate_optimization": False,  # Don't re-run optimization
+            }
+
+            async with async_timeout.timeout(30):
+                response = await self.session.post(
+                    f"{self.supabase_url}/functions/v1/save-preferences",
+                    json=payload,
+                    headers={"Authorization": f"Bearer {DEFAULT_SUPABASE_ANON_KEY}"},
+                )
+                response.raise_for_status()
+                result = await response.json()
+
+                if result.get("status") == "success":
+                    _LOGGER.info("Preferences saved to database successfully")
+                else:
+                    _LOGGER.warning(f"Save preferences returned status: {result.get('status')}")
+
+        except Exception as err:
+            _LOGGER.error(f"Error saving preferences to database: {err}")
 
     async def async_optimize_and_save(self, immediate: bool = True) -> None:
         """Optimize schedule and save preferences to Supabase for nightly runs."""
