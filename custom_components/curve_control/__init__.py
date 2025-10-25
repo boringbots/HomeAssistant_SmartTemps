@@ -539,15 +539,15 @@ class CurveControlCoordinator(DataUpdateCoordinator):
                 "natural_rate": self.heat_up_rate if self.thermal_learning else None,
             }
 
-            # Call save-preferences edge function (WITHOUT immediate optimization since we already ran it)
+            # Call save-preferences edge function (WITH immediate optimization to save outputs to DB)
             payload = {
                 "user_id": self.user_id,
                 "preferences": preferences,
                 "weather_forecast": weather_forecast,
-                "immediate_optimization": False,  # Don't re-run optimization
+                "immediate_optimization": True,  # Run optimization and save outputs
             }
 
-            async with async_timeout.timeout(30):
+            async with async_timeout.timeout(60):  # Longer timeout for optimization
                 response = await self.session.post(
                     f"{self.supabase_url}/functions/v1/save-preferences",
                     json=payload,
@@ -558,6 +558,24 @@ class CurveControlCoordinator(DataUpdateCoordinator):
 
                 if result.get("status") == "success":
                     _LOGGER.info("Preferences saved to database successfully")
+
+                    # Process returned optimization results
+                    if "optimization" in result:
+                        optimization_data = result["optimization"]
+                        # Store the optimization results
+                        self.optimization_results = optimization_data
+                        self.schedule_data = optimization_data.get("HourlyTemperature", [])
+                        self._daily_schedule = optimization_data.get("bestTempActual", [])
+
+                        from datetime import datetime
+                        self._schedule_date = datetime.now().date()
+
+                        _LOGGER.info(
+                            f"Optimization outputs saved - Savings: ${optimization_data.get('costSavings', 0):.2f}"
+                        )
+
+                        # Trigger coordinator update to notify entities
+                        self.async_set_updated_data(optimization_data)
                 else:
                     _LOGGER.warning(f"Save preferences returned status: {result.get('status')}")
 
