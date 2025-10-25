@@ -206,6 +206,39 @@ class CurveControlCard extends HTMLElement {
             margin-top: 4px;
             text-align: center;
           }
+          .loading-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            background: var(--primary-color);
+            color: white;
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            animation: pulse 2s ease-in-out infinite;
+          }
+          .spinner {
+            font-size: 24px;
+            animation: rotate 2s linear infinite;
+          }
+          @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.85; }
+          }
+          .loading-text {
+            text-align: left;
+            line-height: 1.4;
+          }
+          .loading-subtext {
+            font-size: 0.85em;
+            opacity: 0.9;
+          }
         </style>
         <ha-card class="card">
           <div class="header">Curve Control Energy Optimizer</div>
@@ -214,6 +247,16 @@ class CurveControlCard extends HTMLElement {
             <button class="tab active" data-tab="display">Dashboard</button>
             <button class="tab" data-tab="basic">Basic Settings</button>
             <button class="tab" data-tab="detailed">Custom Hourly Comfort Ranges</button>
+          </div>
+
+          <!-- Loading Indicator -->
+          <div id="loading-indicator" class="loading-indicator" style="display: none;">
+            <div class="spinner">⏳</div>
+            <div class="loading-text">
+              <strong>Calculating...</strong>
+              <br>
+              <span class="loading-subtext">May take up to 30 seconds</span>
+            </div>
           </div>
 
           <!-- Dashboard Tab -->
@@ -703,7 +746,7 @@ class CurveControlCard extends HTMLElement {
       highInput.min = '65';
       highInput.max = '85';
       highInput.step = '0.5';
-      highInput.value = savedSchedule ? savedSchedule.high[hour] || '75' : '75';
+      highInput.value = savedSchedule ? savedSchedule.high[hour] || '72' : '72';
       highInput.id = `high-${hour}`;
       
       // Save on change
@@ -726,6 +769,20 @@ class CurveControlCard extends HTMLElement {
       hourDiv.appendChild(highInput);
       hourDiv.appendChild(lowInput);
       container.appendChild(hourDiv);
+    }
+  }
+
+  showLoadingIndicator() {
+    const indicator = this.shadowRoot.getElementById('loading-indicator');
+    if (indicator) {
+      indicator.style.display = 'flex';
+    }
+  }
+
+  hideLoadingIndicator() {
+    const indicator = this.shadowRoot.getElementById('loading-indicator');
+    if (indicator) {
+      indicator.style.display = 'none';
     }
   }
 
@@ -755,6 +812,7 @@ class CurveControlCard extends HTMLElement {
     };
 
     console.log('DEBUG: Sending basic settings data:', data);
+    this.showLoadingIndicator();
     this.callUpdateSchedule(data);
   }
 
@@ -782,10 +840,10 @@ class CurveControlCard extends HTMLElement {
     for (let hour = 0; hour < 24; hour++) {
       const highInput = this.shadowRoot.getElementById(`high-${hour}`);
       const lowInput = this.shadowRoot.getElementById(`low-${hour}`);
-      
-      const highTemp = parseFloat(highInput?.value || 75);
+
+      const highTemp = parseFloat(highInput?.value || 72);
       const lowTemp = parseFloat(lowInput?.value || 69);
-      
+
       // Add twice for 30-minute intervals (2 intervals per hour)
       highTemperatures.push(highTemp, highTemp);
       lowTemperatures.push(lowTemp, lowTemp);
@@ -810,6 +868,7 @@ class CurveControlCard extends HTMLElement {
     console.log('- High temps:', highTemperatures.slice(0, 8));
     console.log('- Low temps:', lowTemperatures.slice(0, 8));
     console.log('DEBUG: Complete data being sent:', data);
+    this.showLoadingIndicator();
     this.callUpdateSchedule(data);
   }
 
@@ -818,12 +877,16 @@ class CurveControlCard extends HTMLElement {
 
     this._hass.callService('curve_control', 'update_schedule', data)
       .then(() => {
+        // Hide loading indicator
+        this.hideLoadingIndicator();
         // Switch back to display tab to show results
         this.switchTab('display');
         // Show success message or update UI
         console.log('Schedule update requested');
       })
       .catch(err => {
+        // Hide loading indicator
+        this.hideLoadingIndicator();
         console.error('Failed to update schedule:', err);
         alert('Failed to update schedule. Please check your settings.');
       });
@@ -842,8 +905,8 @@ class CurveControlCard extends HTMLElement {
     for (let hour = 0; hour < 24; hour++) {
       const highInput = this.shadowRoot.getElementById(`high-${hour}`);
       const lowInput = this.shadowRoot.getElementById(`low-${hour}`);
-      
-      if (highInput) highInput.value = '75';
+
+      if (highInput) highInput.value = '72';
       if (lowInput) lowInput.value = '69';
     }
     // Clear saved data and save defaults
@@ -888,16 +951,21 @@ class CurveControlCard extends HTMLElement {
 
     console.log('Optimize button clicked - running optimization and saving to Supabase');
 
+    // Show loading indicator
+    this.showLoadingIndicator();
+
     // Disable button and show loading state
     const optimizeBtn = this.shadowRoot.getElementById('optimize-btn');
     if (optimizeBtn) {
       optimizeBtn.disabled = true;
-      optimizeBtn.innerHTML = 'Optimizing...';
+      optimizeBtn.innerHTML = '⏳ Optimizing...';
     }
 
     this._hass.callService('curve_control', 'optimize_schedule', {})
       .then(() => {
         console.log('Optimize schedule service called successfully');
+        // Hide loading indicator
+        this.hideLoadingIndicator();
         // Re-enable button
         if (optimizeBtn) {
           optimizeBtn.disabled = false;
@@ -909,6 +977,8 @@ class CurveControlCard extends HTMLElement {
       })
       .catch(err => {
         console.error('Failed to optimize schedule:', err);
+        // Hide loading indicator
+        this.hideLoadingIndicator();
         alert('Failed to optimize schedule. Please check your authentication and try again.');
         if (optimizeBtn) {
           optimizeBtn.disabled = false;
