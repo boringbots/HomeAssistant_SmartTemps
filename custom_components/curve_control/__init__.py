@@ -287,6 +287,7 @@ class CurveControlCoordinator(DataUpdateCoordinator):
     
     async def _async_update_data(self):
         """Fetch data from backend."""
+        _LOGGER.info("=== _async_update_data() CALLED ===")
         try:
             # Get current thermostat state if available (for reference, but don't override user preferences)
             thermostat_entity = self.entry.data.get(CONF_THERMOSTAT_ENTITY)
@@ -396,12 +397,17 @@ class CurveControlCoordinator(DataUpdateCoordinator):
         _LOGGER.info(f"DEBUG: Updated config after service call: {self.config}")
 
         # Trigger immediate optimization
+        _LOGGER.info("Calling async_request_refresh() to trigger optimization")
         await self.async_request_refresh()
+        _LOGGER.info(f"async_request_refresh() completed. optimization_results: {self.optimization_results is not None}")
 
         # Save to database if requested (for Apply Settings and Apply Custom Schedule buttons)
-        if save_to_db and self.user_id and self.auth_token:
-            _LOGGER.info("Saving updated preferences to database")
-            await self._save_preferences_to_db()
+        if save_to_db:
+            if self.user_id and self.auth_token:
+                _LOGGER.info("Saving updated preferences to database")
+                await self._save_preferences_to_db()
+            else:
+                _LOGGER.warning(f"Cannot save to database - user_id: {self.user_id is not None}, auth_token: {self.auth_token is not None}")
     
     async def force_optimization(self) -> None:
         """Force immediate optimization."""
