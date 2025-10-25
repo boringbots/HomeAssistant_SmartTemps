@@ -489,6 +489,10 @@ class CurveControlCoordinator(DataUpdateCoordinator):
 
     async def _save_preferences_to_db(self) -> None:
         """Save current preferences and optimization results to database (without re-running optimization)."""
+        if not self.user_id or not self.auth_token:
+            _LOGGER.warning("Cannot save to database - user not authenticated")
+            return
+
         try:
             # Get weather forecast if available
             weather_forecast = None
@@ -539,15 +543,16 @@ class CurveControlCoordinator(DataUpdateCoordinator):
                 "natural_rate": self.heat_up_rate if self.thermal_learning else None,
             }
 
-            # Call save-preferences edge function (WITH immediate optimization to save outputs to DB)
+            # Call save-preferences edge function with pre-computed optimization results
             payload = {
                 "user_id": self.user_id,
                 "preferences": preferences,
                 "weather_forecast": weather_forecast,
-                "immediate_optimization": True,  # Run optimization and save outputs
+                "immediate_optimization": False,  # Don't re-run optimization
+                "optimization_results": self.optimization_results if self.optimization_results else None,
             }
 
-            async with async_timeout.timeout(60):  # Longer timeout for optimization
+            async with async_timeout.timeout(30):  # Timeout for saving to database
                 response = await self.session.post(
                     f"{self.supabase_url}/functions/v1/save-preferences",
                     json=payload,
