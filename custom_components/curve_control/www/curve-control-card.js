@@ -287,17 +287,10 @@ class CurveControlCard extends HTMLElement {
               </div>
             </div>
 
-            <div style="text-align: center; margin-top: 16px;">
-              <button class="btn btn-optimize" id="optimize-btn">
-                Optimize Schedule
-              </button>
-              <div class="button-description">Optimize your AC schedule and save for nightly runs</div>
-            </div>
-
             <div class="chart-container">
               <canvas id="schedule-chart"></canvas>
               <div id="no-data" class="no-data" style="display:none;">
-                No schedule data available. Click "Calculate Now" or "Save & Optimize" to generate a schedule.
+                No schedule data available. Go to Basic Settings or Custom Hourly Comfort Ranges tabs to apply your preferences.
               </div>
             </div>
           </div>
@@ -690,12 +683,6 @@ class CurveControlCard extends HTMLElement {
     if (resetDetailed) {
       resetDetailed.addEventListener('click', () => this.resetDetailedSchedule());
     }
-
-    // Optimize button handler
-    const optimizeBtn = this.shadowRoot.getElementById('optimize-btn');
-    if (optimizeBtn) {
-      optimizeBtn.addEventListener('click', () => this.handleOptimize());
-    }
   }
 
   switchTab(tabName) {
@@ -944,47 +931,6 @@ class CurveControlCard extends HTMLElement {
     } catch (e) {
       console.warn('Failed to save schedule:', e);
     }
-  }
-
-  handleOptimize() {
-    if (!this._hass) return;
-
-    console.log('Optimize button clicked - running optimization and saving to Supabase');
-
-    // Show loading indicator
-    this.showLoadingIndicator();
-
-    // Disable button and show loading state
-    const optimizeBtn = this.shadowRoot.getElementById('optimize-btn');
-    if (optimizeBtn) {
-      optimizeBtn.disabled = true;
-      optimizeBtn.innerHTML = '⏳ Optimizing...';
-    }
-
-    this._hass.callService('curve_control', 'optimize_schedule', {})
-      .then(() => {
-        console.log('Optimize schedule service called successfully');
-        // Hide loading indicator
-        this.hideLoadingIndicator();
-        // Re-enable button
-        if (optimizeBtn) {
-          optimizeBtn.disabled = false;
-          optimizeBtn.innerHTML = '⚡ Optimize Schedule';
-        }
-        // Show success notification (optional - could add toast notification here)
-        console.log('Optimization complete! Saved for nightly runs.');
-        // Update display will happen automatically via state changes
-      })
-      .catch(err => {
-        console.error('Failed to optimize schedule:', err);
-        // Hide loading indicator
-        this.hideLoadingIndicator();
-        alert('Failed to optimize schedule. Please check your authentication and try again.');
-        if (optimizeBtn) {
-          optimizeBtn.disabled = false;
-          optimizeBtn.innerHTML = '⚡ Optimize Schedule';
-        }
-      });
   }
 
   getCardSize() {
