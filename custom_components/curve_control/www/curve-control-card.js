@@ -6,6 +6,7 @@ class CurveControlCard extends HTMLElement {
     super();
     this.attachShadow({ mode: 'open' });
     this.currentTab = 'display';
+    this._listenersSetup = false; // Track if event listeners are already set up
   }
 
   setConfig(config) {
@@ -651,6 +652,12 @@ class CurveControlCard extends HTMLElement {
   }
 
   setupEventListeners() {
+    // Only set up listeners once to prevent duplicate service calls
+    if (this._listenersSetup) {
+      return;
+    }
+    this._listenersSetup = true;
+
     // Tab switching
     const tabs = this.shadowRoot.querySelectorAll('.tab');
     tabs.forEach(tab => {

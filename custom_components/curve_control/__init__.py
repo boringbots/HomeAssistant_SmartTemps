@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import timedelta
 from typing import Any
 import os
@@ -225,6 +226,10 @@ class CurveControlCoordinator(DataUpdateCoordinator):
         self.heat_up_rate = HEAT_30MIN  # Default value for 30-min intervals
         self.cool_down_rate = COOL_30MIN  # Default value for 30-min intervals
 
+        # Debouncing for preventing duplicate service calls
+        self._last_update_time = 0
+        self._update_debounce_seconds = 2  # Ignore calls within 2 seconds
+
         # Initialize thermal learning
         self.thermal_learning = None
         thermostat_entity = entry.data.get(CONF_THERMOSTAT_ENTITY)
@@ -287,7 +292,7 @@ class CurveControlCoordinator(DataUpdateCoordinator):
     
     async def _async_update_data(self):
         """Fetch data from backend."""
-        _LOGGER.info("=== _async_update_data() CALLED ===")
+        _LOGGER.debug("_async_update_data() called")
         try:
             # Get current thermostat state if available (for reference, but don't override user preferences)
             thermostat_entity = self.entry.data.get(CONF_THERMOSTAT_ENTITY)
@@ -296,9 +301,9 @@ class CurveControlCoordinator(DataUpdateCoordinator):
                 state = self.hass.states.get(thermostat_entity)
                 if state:
                     current_actual_temp = state.attributes.get("current_temperature")
-                    _LOGGER.debug(f"Current actual thermostat temperature: {current_actual_temp}")
+                    # _LOGGER.debug(f"Current actual thermostat temperature: {current_actual_temp}")
             
-            _LOGGER.info(f"DEBUG: Config before optimization - homeTemperature: {self.config.get('homeTemperature')}")
+            # _LOGGER.debug(f"Config before optimization - homeTemperature: {self.config.get('homeTemperature')}")
             
             # Update thermal rates from learning if available
             if self.thermal_learning:
@@ -309,20 +314,20 @@ class CurveControlCoordinator(DataUpdateCoordinator):
                 self.heat_up_rate = learned_natural_rate  # Natural temperature change when HVAC is off
                 self.cool_down_rate = learned_cooling_rate  # AC cooling rate
 
-                _LOGGER.debug(f"Using learned thermal rates - Heating: {learned_heating_rate:.4f}, "
-                             f"Cooling: {learned_cooling_rate:.4f}, Natural: {learned_natural_rate:.4f}")
-                _LOGGER.debug(f"Backend rates - Heat-up (natural): {self.heat_up_rate:.4f}, "
-                             f"Cool-down (AC): {self.cool_down_rate:.4f}")
+                # _LOGGER.debug(f"Using learned thermal rates - Heating: {learned_heating_rate:.4f}, "
+                #              f"Cooling: {learned_cooling_rate:.4f}, Natural: {learned_natural_rate:.4f}")
+                # _LOGGER.debug(f"Backend rates - Heat-up (natural): {self.heat_up_rate:.4f}, "
+                #              f"Cool-down (AC): {self.cool_down_rate:.4f}")
             
             # Generate 30-minute temperature schedule (custom or basic)
             if self._custom_temperature_schedule:
                 schedule_data = self._custom_temperature_schedule
-                _LOGGER.info("Using custom temperature schedule from frontend")
-                _LOGGER.info(f"DEBUG: Custom schedule has {len(schedule_data.get('highTemperatures', []))} high temps")
+                _LOGGER.info("Using custom temperature schedule")
+                # _LOGGER.debug(f"Custom schedule has {len(schedule_data.get('highTemperatures', []))} high temps")
             else:
                 schedule_data = self._build_30min_temperature_schedule()
-                _LOGGER.info("Using basic temperature schedule")
-                _LOGGER.info(f"DEBUG: Basic schedule has {len(schedule_data.get('highTemperatures', []))} high temps")
+                # _LOGGER.info("Using basic temperature schedule")
+                # _LOGGER.debug(f"Basic schedule has {len(schedule_data.get('highTemperatures', []))} high temps")
 
             # Prepare request with schedule data
             request_data = {
@@ -332,8 +337,8 @@ class CurveControlCoordinator(DataUpdateCoordinator):
                 "coolDownRate": self.cool_down_rate,
             }
 
-            _LOGGER.info(f"DEBUG: Sending to Heroku backend - homeSize: {request_data.get('homeSize')}, location: {request_data.get('location')}")
-            _LOGGER.info(f"DEBUG: temperatureSchedule high temps (first 4): {schedule_data.get('highTemperatures', [])[:4]}")
+            # _LOGGER.debug(f"Sending to Heroku backend - homeSize: {request_data.get('homeSize')}, location: {request_data.get('location')}")
+            # _LOGGER.debug(f"temperatureSchedule high temps (first 4): {schedule_data.get('highTemperatures', [])[:4]}")
             
             # Call backend for optimization
             async with async_timeout.timeout(30):
@@ -370,8 +375,17 @@ class CurveControlCoordinator(DataUpdateCoordinator):
     
     async def async_update_schedule(self, data: dict[str, Any], save_to_db: bool = False) -> None:
         """Update the schedule configuration and trigger immediate optimization."""
+        # Debounce: Prevent duplicate calls within 2 seconds
+        current_time = time.time()
+        time_since_last_update = current_time - self._last_update_time
+
+        if time_since_last_update < self._update_debounce_seconds:
+            _LOGGER.warning(f"Ignoring duplicate service call (called {time_since_last_update:.2f}s after previous call)")
+            return
+
+        self._last_update_time = current_time
         _LOGGER.info("User updated preferences - triggering optimization")
-        _LOGGER.info(f"DEBUG: Received service call data: {data}")
+        # _LOGGER.debug(f"Received service call data: {data}")
 
         # Update configuration from frontend data
         if "homeSize" in data:
@@ -393,19 +407,19 @@ class CurveControlCoordinator(DataUpdateCoordinator):
         if "temperatureSchedule" in data:
             self._custom_temperature_schedule = data["temperatureSchedule"]
             _LOGGER.info(f"Custom temperature schedule received from frontend")
-            _LOGGER.info(f"DEBUG: Custom schedule - High temps (first 8): {self._custom_temperature_schedule.get('highTemperatures', [])[:8]}")
-            _LOGGER.info(f"DEBUG: Custom schedule - Low temps (first 8): {self._custom_temperature_schedule.get('lowTemperatures', [])[:8]}")
-            _LOGGER.info(f"DEBUG: Custom schedule - Total intervals: {len(self._custom_temperature_schedule.get('highTemperatures', []))}")
+            _LOGGER.debug(f"Custom schedule - High temps (first 8): {self._custom_temperature_schedule.get('highTemperatures', [])[:8]}")
+            _LOGGER.debug(f"Custom schedule - Low temps (first 8): {self._custom_temperature_schedule.get('lowTemperatures', [])[:8]}")
+            _LOGGER.debug(f"Custom schedule - Total intervals: {len(self._custom_temperature_schedule.get('highTemperatures', []))}")
         else:
             # Clear custom schedule for basic mode
             self._custom_temperature_schedule = None
 
-        _LOGGER.info(f"DEBUG: Updated config after service call: {self.config}")
+        _LOGGER.debug(f"Updated config after service call: {self.config}")
 
         # Trigger immediate optimization
-        _LOGGER.info("Calling async_request_refresh() to trigger optimization")
+        _LOGGER.debug("Calling async_request_refresh() to trigger optimization")
         await self.async_request_refresh()
-        _LOGGER.info(f"async_request_refresh() completed. optimization_results: {self.optimization_results is not None}")
+        _LOGGER.debug(f"async_request_refresh() completed. optimization_results: {self.optimization_results is not None}")
 
         # Save to database if requested (for Apply Settings and Apply Custom Schedule buttons)
         if save_to_db:
