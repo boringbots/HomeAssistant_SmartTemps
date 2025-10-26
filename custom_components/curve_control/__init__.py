@@ -318,10 +318,12 @@ class CurveControlCoordinator(DataUpdateCoordinator):
             if self._custom_temperature_schedule:
                 schedule_data = self._custom_temperature_schedule
                 _LOGGER.info("Using custom temperature schedule from frontend")
+                _LOGGER.info(f"DEBUG: Custom schedule has {len(schedule_data.get('highTemperatures', []))} high temps")
             else:
                 schedule_data = self._build_30min_temperature_schedule()
                 _LOGGER.info("Using basic temperature schedule")
-            
+                _LOGGER.info(f"DEBUG: Basic schedule has {len(schedule_data.get('highTemperatures', []))} high temps")
+
             # Prepare request with schedule data
             request_data = {
                 **self.config,
@@ -329,8 +331,9 @@ class CurveControlCoordinator(DataUpdateCoordinator):
                 "heatUpRate": self.heat_up_rate,
                 "coolDownRate": self.cool_down_rate,
             }
-            
-            _LOGGER.info(f"DEBUG: Sending to Heroku backend: {request_data}")
+
+            _LOGGER.info(f"DEBUG: Sending to Heroku backend - homeSize: {request_data.get('homeSize')}, location: {request_data.get('location')}")
+            _LOGGER.info(f"DEBUG: temperatureSchedule high temps (first 4): {schedule_data.get('highTemperatures', [])[:4]}")
             
             # Call backend for optimization
             async with async_timeout.timeout(30):
@@ -389,7 +392,10 @@ class CurveControlCoordinator(DataUpdateCoordinator):
         # Store custom temperature schedule if provided (for detailed mode)
         if "temperatureSchedule" in data:
             self._custom_temperature_schedule = data["temperatureSchedule"]
-            _LOGGER.info("Custom temperature schedule received from frontend")
+            _LOGGER.info(f"Custom temperature schedule received from frontend")
+            _LOGGER.info(f"DEBUG: Custom schedule - High temps (first 8): {self._custom_temperature_schedule.get('highTemperatures', [])[:8]}")
+            _LOGGER.info(f"DEBUG: Custom schedule - Low temps (first 8): {self._custom_temperature_schedule.get('lowTemperatures', [])[:8]}")
+            _LOGGER.info(f"DEBUG: Custom schedule - Total intervals: {len(self._custom_temperature_schedule.get('highTemperatures', []))}")
         else:
             # Clear custom schedule for basic mode
             self._custom_temperature_schedule = None
