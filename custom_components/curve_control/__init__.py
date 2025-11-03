@@ -38,7 +38,6 @@ from .const import (
     HEAT_30MIN,
     DEADBAND_OFFSET,
 )
-from .thermal_learning import ThermalLearningManager
 from .data_collector import DataCollector
 
 _LOGGER = logging.getLogger(__name__)
@@ -118,10 +117,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Create the data coordinator
     coordinator = CurveControlCoordinator(hass, entry)
 
-    # Set up thermal learning if thermostat is configured
-    if coordinator.thermal_learning:
-        await coordinator.thermal_learning.async_setup()
-
     # Set up data collector if user is authenticated
     if coordinator.data_collector:
         await coordinator.data_collector.async_start()
@@ -181,13 +176,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    # Clean up thermal learning and data collector
+    # Clean up data collector
     data = hass.data[DOMAIN].get(entry.entry_id)
     if data:
         coordinator = data.get("coordinator")
         if coordinator:
-            if coordinator.thermal_learning:
-                await coordinator.thermal_learning.async_cleanup()
             if coordinator.data_collector:
                 await coordinator.data_collector.async_stop()
 
@@ -226,17 +219,18 @@ class CurveControlCoordinator(DataUpdateCoordinator):
         self.heat_up_rate = HEAT_30MIN  # Default value for 30-min intervals
         self.cool_down_rate = COOL_30MIN  # Default value for 30-min intervals
 
+        # Thermal rates from backend (learned rates)
+        self.backend_heating_rate = None
+        self.backend_cooling_rate = None
+        self.backend_natural_rate = None
+        self.thermal_rates_last_fetched = None
+
         # Debouncing for preventing duplicate service calls
         self._last_update_time = 0
         self._update_debounce_seconds = 2  # Ignore calls within 2 seconds
 
-        # Initialize thermal learning
-        self.thermal_learning = None
-        thermostat_entity = entry.data.get(CONF_THERMOSTAT_ENTITY)
-        if thermostat_entity:
-            self.thermal_learning = ThermalLearningManager(hass, thermostat_entity)
-
         # Initialize data collector (if user is authenticated)
+        thermostat_entity = entry.data.get(CONF_THERMOSTAT_ENTITY)
         self.data_collector = None
         if self.user_id and self.auth_token and thermostat_entity:
             self.data_collector = DataCollector(
@@ -289,7 +283,55 @@ class CurveControlCoordinator(DataUpdateCoordinator):
         """Handle midnight optimization trigger."""
         _LOGGER.info("Running scheduled midnight optimization")
         await self.async_request_refresh()
-    
+
+    async def _async_fetch_thermal_rates_from_backend(self) -> None:
+        """Fetch thermal rates from Supabase backend."""
+        if not self.user_id or not self.auth_token:
+            _LOGGER.debug("Cannot fetch thermal rates - user not authenticated")
+            return
+
+        try:
+            async with async_timeout.timeout(10):
+                response = await self.session.post(
+                    f"{self.supabase_url}/functions/v1/calculate-rates",
+                    json={"anonymous_id": self.user_id},
+                    headers={"Authorization": f"Bearer {DEFAULT_SUPABASE_ANON_KEY}"},
+                )
+
+                if response.status == 200:
+                    data = await response.json()
+
+                    if data.get("success") and data.get("thermal_rates"):
+                        rates = data["thermal_rates"]
+                        self.backend_heating_rate = rates.get("heating_rate")
+                        self.backend_cooling_rate = rates.get("cooling_rate")
+                        self.backend_natural_rate = rates.get("natural_rate")
+
+                        from datetime import datetime
+                        self.thermal_rates_last_fetched = datetime.now()
+
+                        # Update current rates if backend provided valid values
+                        if self.backend_natural_rate is not None:
+                            self.heat_up_rate = self.backend_natural_rate
+                        if self.backend_cooling_rate is not None:
+                            self.cool_down_rate = self.backend_cooling_rate
+
+                        _LOGGER.info(
+                            f"Fetched thermal rates from backend - "
+                            f"Heating: {self.backend_heating_rate:.4f if self.backend_heating_rate else 'N/A'}, "
+                            f"Cooling: {self.backend_cooling_rate:.4f if self.backend_cooling_rate else 'N/A'}, "
+                            f"Natural: {self.backend_natural_rate:.4f if self.backend_natural_rate else 'N/A'}"
+                        )
+                    else:
+                        _LOGGER.debug("Backend returned no thermal rates - using defaults")
+                else:
+                    _LOGGER.warning(f"Backend returned status {response.status} when fetching thermal rates")
+
+        except aiohttp.ClientError as err:
+            _LOGGER.debug(f"Could not fetch thermal rates from backend: {err}")
+        except Exception as err:
+            _LOGGER.debug(f"Error fetching thermal rates: {err}")
+
     async def _async_update_data(self):
         """Fetch data from backend."""
         _LOGGER.debug("_async_update_data() called")
@@ -304,21 +346,10 @@ class CurveControlCoordinator(DataUpdateCoordinator):
                     # _LOGGER.debug(f"Current actual thermostat temperature: {current_actual_temp}")
             
             # _LOGGER.debug(f"Config before optimization - homeTemperature: {self.config.get('homeTemperature')}")
-            
-            # Update thermal rates from learning if available
-            if self.thermal_learning:
-                learned_heating_rate, learned_cooling_rate, learned_natural_rate = self.thermal_learning.get_thermal_rates_with_fallback()
 
-                # For the backend optimization, we primarily use cooling rate and natural rate
-                # The backend expects heat_up_rate (natural gain) and cool_down_rate (AC cooling)
-                self.heat_up_rate = learned_natural_rate  # Natural temperature change when HVAC is off
-                self.cool_down_rate = learned_cooling_rate  # AC cooling rate
+            # Fetch thermal rates from backend before optimization
+            await self._async_fetch_thermal_rates_from_backend()
 
-                # _LOGGER.debug(f"Using learned thermal rates - Heating: {learned_heating_rate:.4f}, "
-                #              f"Cooling: {learned_cooling_rate:.4f}, Natural: {learned_natural_rate:.4f}")
-                # _LOGGER.debug(f"Backend rates - Heat-up (natural): {self.heat_up_rate:.4f}, "
-                #              f"Cool-down (AC): {self.cool_down_rate:.4f}")
-            
             # Generate 30-minute temperature schedule (custom or basic)
             if self._custom_temperature_schedule:
                 schedule_data = self._custom_temperature_schedule
@@ -564,9 +595,9 @@ class CurveControlCoordinator(DataUpdateCoordinator):
                 "time_home": self.config["timeHome"],
                 "high_temperatures": schedule_data.get("highTemperatures"),
                 "low_temperatures": schedule_data.get("lowTemperatures"),
-                "heating_rate": self.heat_up_rate if self.thermal_learning else None,
-                "cooling_rate": self.cool_down_rate if self.thermal_learning else None,
-                "natural_rate": self.heat_up_rate if self.thermal_learning else None,
+                "heating_rate": self.backend_heating_rate,
+                "cooling_rate": self.backend_cooling_rate,
+                "natural_rate": self.backend_natural_rate,
             }
 
             # Call save-preferences edge function with pre-computed optimization results
@@ -667,9 +698,9 @@ class CurveControlCoordinator(DataUpdateCoordinator):
                 "time_home": self.config["timeHome"],
                 "high_temperatures": schedule_data.get("highTemperatures"),
                 "low_temperatures": schedule_data.get("lowTemperatures"),
-                "heating_rate": self.heat_up_rate if self.thermal_learning else None,
-                "cooling_rate": self.cool_down_rate if self.thermal_learning else None,
-                "natural_rate": self.heat_up_rate if self.thermal_learning else None,
+                "heating_rate": self.backend_heating_rate,
+                "cooling_rate": self.backend_cooling_rate,
+                "natural_rate": self.backend_natural_rate,
             }
 
             # Call save-preferences edge function

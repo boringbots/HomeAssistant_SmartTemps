@@ -485,60 +485,43 @@ class CurveControlScheduleChartSensor(CurveControlBaseSensor):
 
 
 class CurveControlThermalLearningSensor(CurveControlBaseSensor):
-    """Sensor for thermal learning data."""
-    
+    """Sensor for thermal learning data from backend."""
+
     _attr_name = "Thermal Learning"
     _attr_icon = "mdi:thermometer-auto"
-    
+
     def __init__(self, coordinator, entry):
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "thermal_learning", "Thermal Learning")
         self._attr_unique_id = f"{entry.entry_id}_thermal_learning"
-    
+
     @property
     def native_value(self) -> str:
         """Return the state of the sensor."""
-        if not self.coordinator.thermal_learning:
-            return "Disabled"
-        
-        if self.coordinator.thermal_learning.has_sufficient_data():
-            return "Learning Complete"
+        # Check if we have backend thermal rates
+        if self.coordinator.backend_heating_rate is not None or \
+           self.coordinator.backend_cooling_rate is not None or \
+           self.coordinator.backend_natural_rate is not None:
+            return "Backend Learned"
         else:
-            return "Learning"
-    
+            return "Using Defaults"
+
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional attributes."""
-        if not self.coordinator.thermal_learning:
-            return {
-                "status": "No thermostat configured",
-                "heating_rate_learned": None,
-                "cooling_rate_learned": None,
-                "natural_rate_learned": None,
-            }
-        
-        # Get thermal learning summary
-        summary = self.coordinator.thermal_learning.get_data_summary()
-        heating_rate, cooling_rate, natural_rate = self.coordinator.thermal_learning.get_thermal_rates()
-        
         # Get default rates for comparison
         from .const import HEAT_30MIN, COOL_30MIN
-        
+
         return {
-            "heating_rate_learned": heating_rate,
-            "cooling_rate_learned": cooling_rate,
-            "natural_rate_learned": natural_rate,
+            "heating_rate_learned": self.coordinator.backend_heating_rate,
+            "cooling_rate_learned": self.coordinator.backend_cooling_rate,
+            "natural_rate_learned": self.coordinator.backend_natural_rate,
             "heat_up_rate_default": HEAT_30MIN,
             "cool_down_rate_default": COOL_30MIN,
             "heat_up_rate_current": self.coordinator.heat_up_rate,
             "cool_down_rate_current": self.coordinator.cool_down_rate,
-            "total_data_points": summary.get("total_data_points"),
-            "recent_data_points": summary.get("recent_data_points"),
-            "heating_samples": summary.get("heating_samples"),
-            "cooling_samples": summary.get("cooling_samples"),
-            "natural_samples": summary.get("natural_samples"),
-            "has_sufficient_data": summary.get("has_sufficient_data"),
-            "last_calculation": summary.get("last_calculation"),
+            "last_fetched": self.coordinator.thermal_rates_last_fetched.isoformat() if self.coordinator.thermal_rates_last_fetched else None,
+            "source": "Supabase Backend",
             "learning_window_days": 7,
-            "status": "Learning Complete" if summary.get("has_sufficient_data") else "Collecting Data",
+            "status": "Backend Learned" if (self.coordinator.backend_heating_rate or self.coordinator.backend_cooling_rate or self.coordinator.backend_natural_rate) else "Using Defaults",
         }
