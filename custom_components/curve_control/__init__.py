@@ -42,7 +42,7 @@ from .data_collector import DataCollector
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.CLIMATE, Platform.SENSOR, Platform.SWITCH, Platform.BUTTON, Platform.SELECT]
+PLATFORMS: list[Platform] = [Platform.CLIMATE, Platform.SENSOR, Platform.BUTTON, Platform.SELECT]
 
 
 def _copy_card_file(source_path: str, dest_path: str, www_dir: str) -> bool:
