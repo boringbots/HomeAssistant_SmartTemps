@@ -20,9 +20,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Curve Control select entities."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
 
-    async_add_entities([CurveControlOptimizationModeSelect(coordinator)])
+    async_add_entities([CurveControlOptimizationModeSelect(coordinator, entry)])
 
 
 class CurveControlOptimizationModeSelect(SelectEntity):
@@ -32,12 +32,13 @@ class CurveControlOptimizationModeSelect(SelectEntity):
     _attr_name = "Optimization Mode"
     _attr_icon = "mdi:tune"
 
-    def __init__(self, coordinator) -> None:
+    def __init__(self, coordinator, entry: ConfigEntry) -> None:
         """Initialize the optimization mode selector."""
         self.coordinator = coordinator
-        self._attr_unique_id = f"{coordinator.config['anonymousId']}_optimization_mode"
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_optimization_mode"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, coordinator.config["anonymousId"])},
+            "identifiers": {(DOMAIN, coordinator.entry.entry_id)},
             "name": "Curve Control",
             "manufacturer": "Curve Control",
             "model": "Smart Thermostat Optimizer",
