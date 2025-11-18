@@ -82,11 +82,16 @@ ENTITY_SENSOR_SAVINGS: Final = "sensor.curve_control_savings"
 ENTITY_SENSOR_CO2: Final = "sensor.curve_control_co2_avoided"
 ENTITY_SENSOR_STATUS: Final = "sensor.curve_control_status"
 
-# Temperature calculation constants
-COOL_30MIN: Final = 1.6500  # Temperature drop per 30 minutes when AC is ON
-HEAT_30MIN: Final = 0.5535  # Temperature rise per 30 minutes when AC is OFF
+# Temperature calculation constants (signed convention)
+COOLING_RATE_30MIN: Final = -1.9335  # Negative for cooling (degrees F per 30 min when AC is ON)
+HEATING_RATE_30MIN: Final = 1.25  # Positive for heating (degrees F per 30 min when heat is ON)
+NATURAL_DRIFT_30MIN: Final = 0.5535  # Natural temperature rise when HVAC is OFF (summer baseline)
 DEADBAND_OFFSET: Final = 1.4  # Deadband temperature offset
 NORMAL_AWAY_OFFSET: Final = 3  # Normal away temperature offset
+
+# Deprecated - use signed constants above
+COOL_30MIN: Final = -1.9335  # Legacy - use COOLING_RATE_30MIN
+HEAT_30MIN: Final = 0.5535  # Legacy - use NATURAL_DRIFT_30MIN
 
 # HVAC constants
 AREA_CONVERSION: Final = 20  # BTU/h minimum size AC for house conversion

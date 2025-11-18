@@ -509,17 +509,20 @@ class CurveControlThermalLearningSensor(CurveControlBaseSensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional attributes."""
-        # Get default rates for comparison
-        from .const import HEAT_30MIN, COOL_30MIN
+        # Get default rates for comparison (using signed convention)
+        from .const import HEATING_RATE_30MIN, COOLING_RATE_30MIN, NATURAL_DRIFT_30MIN
 
         return {
             "heating_rate_learned": self.coordinator.backend_heating_rate,
             "cooling_rate_learned": self.coordinator.backend_cooling_rate,
             "natural_rate_learned": self.coordinator.backend_natural_rate,
-            "heat_up_rate_default": HEAT_30MIN,
-            "cool_down_rate_default": COOL_30MIN,
+            "heating_rate_default": HEATING_RATE_30MIN,  # +1.25°F per 30min
+            "cooling_rate_default": COOLING_RATE_30MIN,  # -1.9335°F per 30min
+            "natural_rate_default_cool": NATURAL_DRIFT_30MIN,  # +0.5535°F per 30min (summer)
+            "natural_rate_default_heat": -NATURAL_DRIFT_30MIN,  # -0.5535°F per 30min (winter)
             "heat_up_rate_current": self.coordinator.heat_up_rate,
             "cool_down_rate_current": self.coordinator.cool_down_rate,
+            "optimization_mode": self.coordinator.optimization_mode,
             "last_fetched": self.coordinator.thermal_rates_last_fetched.isoformat() if self.coordinator.thermal_rates_last_fetched else None,
             "source": "Supabase Backend",
             "learning_window_days": 7,

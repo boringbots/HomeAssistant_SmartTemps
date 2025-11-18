@@ -34,8 +34,8 @@ from .const import (
     DEFAULT_SUPABASE_URL,
     DEFAULT_SUPABASE_ANON_KEY,
     INTERVALS_PER_DAY,
-    COOL_30MIN,
-    HEAT_30MIN,
+    COOLING_RATE_30MIN,
+    HEATING_RATE_30MIN,
     DEADBAND_OFFSET,
 )
 from .data_collector import DataCollector
@@ -217,8 +217,8 @@ class CurveControlCoordinator(DataUpdateCoordinator):
         # Initialize data storage
         self.schedule_data = None
         self.optimization_results = None
-        self.heat_up_rate = HEAT_30MIN  # Default value for 30-min intervals
-        self.cool_down_rate = COOL_30MIN  # Default value for 30-min intervals
+        self.heat_up_rate = HEATING_RATE_30MIN  # Default heating rate (1.25°F per 30 min)
+        self.cool_down_rate = COOLING_RATE_30MIN  # Default cooling rate (-1.9335°F per 30 min)
 
         # Thermal rates from backend (learned rates)
         self.backend_heating_rate = None
@@ -244,7 +244,7 @@ class CurveControlCoordinator(DataUpdateCoordinator):
                 humidity_entity=None,  # Could be added to config in future
                 weather_entity=entry.data.get(CONF_WEATHER_ENTITY),
                 supabase_url=self.supabase_url,
-                coordinator=self,  # Pass coordinator for optimization_enabled tracking
+                coordinator=self,  # Pass coordinator for optimization_mode tracking
             )
             _LOGGER.info(f"Data collector initialized for user {self.user_id}")
 
@@ -367,7 +367,15 @@ class CurveControlCoordinator(DataUpdateCoordinator):
                 "temperatureSchedule": schedule_data,
                 "heatUpRate": self.heat_up_rate,
                 "coolDownRate": self.cool_down_rate,
+                "mode": self.optimization_mode,
             }
+
+            # Only send naturalRate if we have a learned value
+            # Let Python backend use its mode-aware defaults otherwise:
+            # - Cool mode: +0.5535 (house warms naturally in summer)
+            # - Heat mode: -0.5535 (house cools naturally in winter)
+            if self.backend_natural_rate is not None:
+                request_data["naturalRate"] = self.backend_natural_rate
 
             # _LOGGER.debug(f"Sending to Heroku backend - homeSize: {request_data.get('homeSize')}, location: {request_data.get('location')}")
             # _LOGGER.debug(f"temperatureSchedule high temps (first 4): {schedule_data.get('highTemperatures', [])[:4]}")
