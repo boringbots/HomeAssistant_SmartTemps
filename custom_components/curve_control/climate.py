@@ -155,8 +155,8 @@ class CurveControlThermostat(CoordinatorEntity, ClimateEntity):
         if not self._thermostat_entity_id or not self.coordinator.optimization_results:
             return
         
-        # Check if optimization is enabled
-        if not self.coordinator.optimization_enabled:
+        # Check if optimization is enabled (mode is not 'off')
+        if self.coordinator.optimization_mode == "off":
             return
         
         # Get current optimal setpoint
@@ -206,8 +206,8 @@ class CurveControlThermostat(CoordinatorEntity, ClimateEntity):
     @property
     def target_temperature(self) -> float | None:
         """Return the temperature we try to reach."""
-        # Get optimized setpoint from coordinator if optimization is enabled
-        if self.coordinator.optimization_enabled:
+        # Get optimized setpoint from coordinator if optimization is enabled (mode is not 'off')
+        if self.coordinator.optimization_mode != "off":
             setpoint = self.coordinator.get_current_setpoint()
             if setpoint:
                 return setpoint
@@ -348,8 +348,8 @@ class CurveControlThermostat(CoordinatorEntity, ClimateEntity):
         """Handle updated data from the coordinator."""
         _LOGGER.info("Coordinator updated - new optimization received")
         
-        # Only apply setpoint if optimization is enabled
-        if not self.coordinator.optimization_enabled:
+        # Only apply setpoint if optimization is enabled (mode is not 'off')
+        if self.coordinator.optimization_mode == "off":
             _LOGGER.info("Optimization disabled - skipping automatic control")
             self._sync_with_thermostat()
             self.async_write_ha_state()

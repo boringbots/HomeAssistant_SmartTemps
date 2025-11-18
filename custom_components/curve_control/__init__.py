@@ -42,7 +42,7 @@ from .data_collector import DataCollector
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.CLIMATE, Platform.SENSOR, Platform.SWITCH, Platform.BUTTON]
+PLATFORMS: list[Platform] = [Platform.CLIMATE, Platform.SENSOR, Platform.SWITCH, Platform.BUTTON, Platform.SELECT]
 
 
 def _copy_card_file(source_path: str, dest_path: str, www_dir: str) -> bool:
@@ -205,6 +205,7 @@ class CurveControlCoordinator(DataUpdateCoordinator):
 
         # Store configuration
         self.config = {
+            "anonymousId": self.user_id,  # For device identification
             "homeSize": entry.data[CONF_HOME_SIZE],
             "homeTemperature": entry.data[CONF_TARGET_TEMP],
             "location": entry.data[CONF_LOCATION],
@@ -252,7 +253,7 @@ class CurveControlCoordinator(DataUpdateCoordinator):
         self._schedule_date = None
         self._midnight_listener = None
         self._custom_temperature_schedule = None  # For detailed frontend schedules
-        self.optimization_enabled = True  # Flag for optimization toggle
+        self.optimization_mode = "cool"  # Optimization mode: 'off', 'cool', or 'heat'
         
         super().__init__(
             hass,
@@ -311,8 +312,8 @@ class CurveControlCoordinator(DataUpdateCoordinator):
                         self.thermal_rates_last_fetched = datetime.now()
 
                         # Update current rates if backend provided valid values
-                        if self.backend_natural_rate is not None:
-                            self.heat_up_rate = self.backend_natural_rate
+                        if self.backend_heating_rate is not None:
+                            self.heat_up_rate = self.backend_heating_rate
                         if self.backend_cooling_rate is not None:
                             self.cool_down_rate = self.backend_cooling_rate
 
@@ -598,6 +599,7 @@ class CurveControlCoordinator(DataUpdateCoordinator):
                 "heating_rate": self.backend_heating_rate,
                 "cooling_rate": self.backend_cooling_rate,
                 "natural_rate": self.backend_natural_rate,
+                "optimization_mode": self.optimization_mode,
             }
 
             # Call save-preferences edge function with pre-computed optimization results
@@ -701,6 +703,7 @@ class CurveControlCoordinator(DataUpdateCoordinator):
                 "heating_rate": self.backend_heating_rate,
                 "cooling_rate": self.backend_cooling_rate,
                 "natural_rate": self.backend_natural_rate,
+                "optimization_mode": self.optimization_mode,
             }
 
             # Call save-preferences edge function

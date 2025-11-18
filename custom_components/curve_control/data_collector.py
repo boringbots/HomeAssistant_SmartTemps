@@ -163,7 +163,7 @@ class DataCollector:
                 "fan_mode": fan_mode,
                 "fan_state": fan_state,
                 "target_temp": float(thermostat_state.attributes.get("temperature", 0)),
-                "optimization_enabled": self.coordinator.optimization_enabled if self.coordinator else False,
+                "optimization_mode": self.coordinator.optimization_mode if self.coordinator else "cool",
             }
 
             self.pending_readings.append(reading)
@@ -249,6 +249,7 @@ class DataCollector:
                 ),  # Yesterday's data
                 "user_inputs": user_inputs,
                 "weather_forecast": weather_forecast,
+                "optimization_mode": self.coordinator.optimization_mode if self.coordinator else "cool",
             }
 
             async with session.post(
