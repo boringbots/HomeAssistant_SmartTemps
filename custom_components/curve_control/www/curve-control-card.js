@@ -97,8 +97,31 @@ class CurveControlCard extends HTMLElement {
             padding: 32px;
             color: var(--secondary-text-color);
           }
-          ha-switch {
-            --mdc-theme-secondary: var(--switch-checked-color);
+          .mode-selector {
+            display: flex;
+            gap: 8px;
+            background: var(--card-background-color);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--divider-color);
+          }
+          .mode-button {
+            flex: 1;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--primary-text-color);
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+          }
+          .mode-button:hover {
+            background: var(--secondary-background-color);
+          }
+          .mode-button.active {
+            background: var(--primary-color);
+            color: var(--text-primary-color, white);
           }
           .tabs {
             display: flex;
@@ -263,8 +286,12 @@ class CurveControlCard extends HTMLElement {
           <!-- Dashboard Tab -->
           <div class="tab-content active" id="display-tab">
             <div class="toggle-row">
-              <span class="toggle-label">Use Optimized Schedule</span>
-              <ha-switch id="optimization-toggle"></ha-switch>
+              <span class="toggle-label">Optimization Mode</span>
+              <div class="mode-selector">
+                <button class="mode-button" id="mode-off">Off</button>
+                <button class="mode-button" id="mode-cool">Cool</button>
+                <button class="mode-button" id="mode-heat">Heat</button>
+              </div>
             </div>
 
             <div class="status-row">
@@ -367,32 +394,51 @@ class CurveControlCard extends HTMLElement {
   updateCard() {
     if (!this._hass) return;
 
-    const switchEntity = this._hass.states['switch.curve_control_energy_optimizer_use_optimized_temperatures'];
+    const selectEntity = this._hass.states['select.curve_control_energy_optimizer_optimization_mode'];
     const savingsEntity = this._hass.states['sensor.curve_control_energy_optimizer_energy_savings'];
     const statusEntity = this._hass.states['sensor.curve_control_energy_optimizer_optimization_status'];
     const chartEntity = this._hass.states['sensor.curve_control_energy_optimizer_temperature_schedule_chart'];
     const co2Entity = this._hass.states['sensor.curve_control_energy_optimizer_co2_avoided'];
     const nextTempEntity = this._hass.states['sensor.curve_control_energy_optimizer_next_temperature_setpoint'];
 
-    // Update toggle
-    const toggle = this.shadowRoot.getElementById('optimization-toggle');
-    if (toggle && switchEntity) {
-      toggle.checked = switchEntity.state === 'on';
-      
+    // Update mode buttons
+    const modeOffBtn = this.shadowRoot.getElementById('mode-off');
+    const modeCoolBtn = this.shadowRoot.getElementById('mode-cool');
+    const modeHeatBtn = this.shadowRoot.getElementById('mode-heat');
+
+    if (selectEntity) {
+      const currentMode = selectEntity.state;
+
+      // Update active button styling
+      modeOffBtn.classList.toggle('active', currentMode === 'off');
+      modeCoolBtn.classList.toggle('active', currentMode === 'cool');
+      modeHeatBtn.classList.toggle('active', currentMode === 'heat');
+
       // Remove existing listeners to prevent duplication
-      if (toggle._curveControlHandler) {
-        toggle.removeEventListener('click', toggle._curveControlHandler);
-      }
-      
-      // Add new handler
-      toggle._curveControlHandler = () => {
-        const currentState = switchEntity.state === 'on';
-        this._hass.callService('switch', currentState ? 'turn_off' : 'turn_on', {
-          entity_id: 'switch.curve_control_energy_optimizer_use_optimized_temperatures'
+      if (!this._modeListenersSet) {
+        modeOffBtn.addEventListener('click', () => {
+          this._hass.callService('select', 'select_option', {
+            entity_id: 'select.curve_control_energy_optimizer_optimization_mode',
+            option: 'off'
+          });
         });
-      };
-      
-      toggle.addEventListener('click', toggle._curveControlHandler);
+
+        modeCoolBtn.addEventListener('click', () => {
+          this._hass.callService('select', 'select_option', {
+            entity_id: 'select.curve_control_energy_optimizer_optimization_mode',
+            option: 'cool'
+          });
+        });
+
+        modeHeatBtn.addEventListener('click', () => {
+          this._hass.callService('select', 'select_option', {
+            entity_id: 'select.curve_control_energy_optimizer_optimization_mode',
+            option: 'heat'
+          });
+        });
+
+        this._modeListenersSet = true;
+      }
     }
 
     // Update savings
@@ -414,12 +460,20 @@ class CurveControlCard extends HTMLElement {
       nextTempValue.textContent = !isNaN(temp) ? `${temp.toFixed(1)}°F` : '--°F';
     }
 
-    // Update status based on switch state
+    // Update status based on mode
     const statusValue = this.shadowRoot.getElementById('status-value');
-    if (statusValue && switchEntity) {
-      const isOptimized = switchEntity.state === 'on';
-      statusValue.textContent = isOptimized ? 'optimized' : 'off';
-      statusValue.style.color = isOptimized ? '#4caf50' : '#9e9e9e';  // green when on, grey when off
+    if (statusValue && selectEntity) {
+      const mode = selectEntity.state;
+      if (mode === 'off') {
+        statusValue.textContent = 'Manual';
+        statusValue.style.color = '#9e9e9e';  // grey
+      } else if (mode === 'cool') {
+        statusValue.textContent = 'Cooling';
+        statusValue.style.color = '#2196f3';  // blue
+      } else if (mode === 'heat') {
+        statusValue.textContent = 'Heating';
+        statusValue.style.color = '#ff5722';  // orange/red
+      }
     }
 
     // Update chart
