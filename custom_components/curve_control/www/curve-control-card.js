@@ -394,50 +394,67 @@ class CurveControlCard extends HTMLElement {
   updateCard() {
     if (!this._hass) return;
 
-    const selectEntity = this._hass.states['select.curve_control_energy_optimizer_optimization_mode'];
-    const savingsEntity = this._hass.states['sensor.curve_control_energy_optimizer_energy_savings'];
-    const statusEntity = this._hass.states['sensor.curve_control_energy_optimizer_optimization_status'];
-    const chartEntity = this._hass.states['sensor.curve_control_energy_optimizer_temperature_schedule_chart'];
-    const co2Entity = this._hass.states['sensor.curve_control_energy_optimizer_co2_avoided'];
-    const nextTempEntity = this._hass.states['sensor.curve_control_energy_optimizer_next_temperature_setpoint'];
+    const selectEntity = this._hass.states['select.curve_control_optimization_mode'];
+    const savingsEntity = this._hass.states['sensor.curve_control_savings'];
+    const statusEntity = this._hass.states['sensor.curve_control_status'];
+    const chartEntity = this._hass.states['sensor.curve_control_temperature_schedule_chart'];
+    const co2Entity = this._hass.states['sensor.curve_control_co2_avoided'];
+    const nextTempEntity = this._hass.states['sensor.curve_control_next_temperature_setpoint'];
+
+    // Debug logging
+    if (!selectEntity) {
+      console.log('Curve Control: select.curve_control_optimization_mode entity not found');
+    } else {
+      console.log('Curve Control: Mode is', selectEntity.state);
+    }
 
     // Update mode buttons
     const modeOffBtn = this.shadowRoot.getElementById('mode-off');
     const modeCoolBtn = this.shadowRoot.getElementById('mode-cool');
     const modeHeatBtn = this.shadowRoot.getElementById('mode-heat');
 
-    if (selectEntity) {
+    // Add event listeners (only once, regardless of entity state)
+    if (modeOffBtn && modeCoolBtn && modeHeatBtn && !this._modeListenersSet) {
+      modeOffBtn.addEventListener('click', () => {
+        this._hass.callService('select', 'select_option', {
+          entity_id: 'select.curve_control_optimization_mode',
+          option: 'off'
+        });
+      });
+
+      modeCoolBtn.addEventListener('click', () => {
+        this._hass.callService('select', 'select_option', {
+          entity_id: 'select.curve_control_optimization_mode',
+          option: 'cool'
+        });
+      });
+
+      modeHeatBtn.addEventListener('click', () => {
+        this._hass.callService('select', 'select_option', {
+          entity_id: 'select.curve_control_optimization_mode',
+          option: 'heat'
+        });
+      });
+
+      this._modeListenersSet = true;
+    }
+
+    // Update active button styling based on current state
+    if (selectEntity && modeOffBtn && modeCoolBtn && modeHeatBtn) {
       const currentMode = selectEntity.state;
 
-      // Update active button styling
-      modeOffBtn.classList.toggle('active', currentMode === 'off');
-      modeCoolBtn.classList.toggle('active', currentMode === 'cool');
-      modeHeatBtn.classList.toggle('active', currentMode === 'heat');
+      // Clear all active states first
+      modeOffBtn.classList.remove('active');
+      modeCoolBtn.classList.remove('active');
+      modeHeatBtn.classList.remove('active');
 
-      // Remove existing listeners to prevent duplication
-      if (!this._modeListenersSet) {
-        modeOffBtn.addEventListener('click', () => {
-          this._hass.callService('select', 'select_option', {
-            entity_id: 'select.curve_control_energy_optimizer_optimization_mode',
-            option: 'off'
-          });
-        });
-
-        modeCoolBtn.addEventListener('click', () => {
-          this._hass.callService('select', 'select_option', {
-            entity_id: 'select.curve_control_energy_optimizer_optimization_mode',
-            option: 'cool'
-          });
-        });
-
-        modeHeatBtn.addEventListener('click', () => {
-          this._hass.callService('select', 'select_option', {
-            entity_id: 'select.curve_control_energy_optimizer_optimization_mode',
-            option: 'heat'
-          });
-        });
-
-        this._modeListenersSet = true;
+      // Set the active button
+      if (currentMode === 'off') {
+        modeOffBtn.classList.add('active');
+      } else if (currentMode === 'cool') {
+        modeCoolBtn.classList.add('active');
+      } else if (currentMode === 'heat') {
+        modeHeatBtn.classList.add('active');
       }
     }
 
@@ -483,7 +500,7 @@ class CurveControlCard extends HTMLElement {
       this.shadowRoot.getElementById('schedule-chart').style.display = 'block';
     } else {
       // Check if optimization is pending
-      const statusEntity = this._hass.states['sensor.curve_control_energy_optimizer_status'];
+      const statusEntity = this._hass.states['sensor.curve_control_status'];
       const noDataDiv = this.shadowRoot.getElementById('no-data');
       
       if (statusEntity && statusEntity.state === 'Pending') {
@@ -499,7 +516,7 @@ class CurveControlCard extends HTMLElement {
 
   isDataPending(hass) {
     if (!hass) return false;
-    const statusSensor = hass.states['sensor.curve_control_energy_optimizer_status'];
+    const statusSensor = hass.states['sensor.curve_control_status'];
     return statusSensor && statusSensor.state === 'Pending';
   }
   
