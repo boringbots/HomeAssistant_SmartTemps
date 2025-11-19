@@ -859,6 +859,10 @@ class CurveControlCard extends HTMLElement {
     const timeHome = this.shadowRoot.getElementById('time-home').value;
     const savingsLevel = parseInt(this.shadowRoot.getElementById('savings-level').value);
 
+    // Get current optimization mode
+    const selectEntity = this._hass.states['select.curve_control_optimization_mode'];
+    const optimizationMode = selectEntity ? selectEntity.state : 'cool';
+
     console.log('DEBUG: Basic Settings Form Values:');
     console.log('- homeSize:', homeSize);
     console.log('- targetTemp:', targetTemp);
@@ -866,6 +870,7 @@ class CurveControlCard extends HTMLElement {
     console.log('- timeAway:', timeAway);
     console.log('- timeHome:', timeHome);
     console.log('- savingsLevel:', savingsLevel);
+    console.log('- optimizationMode:', optimizationMode);
 
     const data = {
       homeSize,
@@ -873,7 +878,8 @@ class CurveControlCard extends HTMLElement {
       location,
       timeAway,
       timeHome,
-      savingsLevel
+      savingsLevel,
+      optimizationMode
     };
 
     console.log('DEBUG: Sending basic settings data:', data);
@@ -890,6 +896,10 @@ class CurveControlCard extends HTMLElement {
     const timeHome = this.shadowRoot.getElementById('time-home')?.value || "17:00";
     const savingsLevel = parseInt(this.shadowRoot.getElementById('savings-level')?.value || 2);
 
+    // Get current optimization mode
+    const selectEntity = this._hass.states['select.curve_control_optimization_mode'];
+    const optimizationMode = selectEntity ? selectEntity.state : 'cool';
+
     console.log('DEBUG: Custom Schedule Form Values:');
     console.log('- homeSize:', homeSize);
     console.log('- targetTemp:', targetTemp);
@@ -897,6 +907,7 @@ class CurveControlCard extends HTMLElement {
     console.log('- timeAway:', timeAway);
     console.log('- timeHome:', timeHome);
     console.log('- savingsLevel:', savingsLevel);
+    console.log('- optimizationMode:', optimizationMode);
 
     // Build detailed temperature arrays (convert hourly to 30-min intervals)
     const highTemperatures = [];
@@ -921,6 +932,7 @@ class CurveControlCard extends HTMLElement {
       timeAway,
       timeHome,
       savingsLevel,
+      optimizationMode,
       temperatureSchedule: {
         highTemperatures,
         lowTemperatures,

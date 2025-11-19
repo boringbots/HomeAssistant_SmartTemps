@@ -442,6 +442,10 @@ class CurveControlCoordinator(DataUpdateCoordinator):
         if "timeHome" in data:
             # Ensure time is in HH:MM format - let it fail if format is wrong
             self.config["timeHome"] = str(data["timeHome"])[:5]
+        if "optimizationMode" in data:
+            # Update optimization mode from dashboard
+            self.optimization_mode = data["optimizationMode"]
+            _LOGGER.info(f"Optimization mode set to: {self.optimization_mode}")
 
         # Store custom temperature schedule if provided (for detailed mode)
         if "temperatureSchedule" in data:
