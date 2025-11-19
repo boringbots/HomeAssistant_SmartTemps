@@ -85,8 +85,8 @@ class CurveControlOptimizationModeSelect(SelectEntity):
         if option != "off":
             _LOGGER.info(f"Optimization mode set to {option}, triggering optimization")
             try:
-                # Save preferences with the new mode to backend
-                await self.coordinator.async_save_preferences_to_backend()
+                # Save preferences and trigger optimization with the new mode
+                await self.coordinator.async_optimize_and_save(immediate=True)
             except Exception as e:
                 _LOGGER.error(f"Failed to save optimization mode to backend: {e}")
 

@@ -395,11 +395,11 @@ class CurveControlCard extends HTMLElement {
     if (!this._hass) return;
 
     const selectEntity = this._hass.states['select.curve_control_optimization_mode'];
-    const savingsEntity = this._hass.states['sensor.curve_control_savings'];
-    const statusEntity = this._hass.states['sensor.curve_control_status'];
-    const chartEntity = this._hass.states['sensor.curve_control_temperature_schedule_chart'];
-    const co2Entity = this._hass.states['sensor.curve_control_co2_avoided'];
-    const nextTempEntity = this._hass.states['sensor.curve_control_next_temperature_setpoint'];
+    const savingsEntity = this._hass.states['sensor.curve_control_energy_optimizer_energy_savings'];
+    const statusEntity = this._hass.states['sensor.curve_control_energy_optimizer_optimization_status'];
+    const chartEntity = this._hass.states['sensor.curve_control_energy_optimizer_temperature_schedule_chart'];
+    const co2Entity = this._hass.states['sensor.curve_control_energy_optimizer_co2_avoided'];
+    const nextTempEntity = this._hass.states['sensor.curve_control_energy_optimizer_next_temperature_setpoint'];
 
     // Debug logging
     if (!selectEntity) {
@@ -500,7 +500,7 @@ class CurveControlCard extends HTMLElement {
       this.shadowRoot.getElementById('schedule-chart').style.display = 'block';
     } else {
       // Check if optimization is pending
-      const statusEntity = this._hass.states['sensor.curve_control_status'];
+      const statusEntity = this._hass.states['sensor.curve_control_energy_optimizer_optimization_status'];
       const noDataDiv = this.shadowRoot.getElementById('no-data');
       
       if (statusEntity && statusEntity.state === 'Pending') {
@@ -516,7 +516,7 @@ class CurveControlCard extends HTMLElement {
 
   isDataPending(hass) {
     if (!hass) return false;
-    const statusSensor = hass.states['sensor.curve_control_status'];
+    const statusSensor = hass.states['sensor.curve_control_energy_optimizer_optimization_status'];
     return statusSensor && statusSensor.state === 'Pending';
   }
   
