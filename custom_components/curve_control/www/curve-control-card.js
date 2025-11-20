@@ -859,9 +859,19 @@ class CurveControlCard extends HTMLElement {
     const timeHome = this.shadowRoot.getElementById('time-home').value;
     const savingsLevel = parseInt(this.shadowRoot.getElementById('savings-level').value);
 
-    // Get current optimization mode
-    const selectEntity = this._hass.states['select.curve_control_optimization_mode'];
-    const optimizationMode = selectEntity ? selectEntity.state : 'cool';
+    // Get current optimization mode directly from active button in DOM
+    let optimizationMode = 'cool'; // default
+    const modeOffBtn = this.shadowRoot.getElementById('mode-off');
+    const modeCoolBtn = this.shadowRoot.getElementById('mode-cool');
+    const modeHeatBtn = this.shadowRoot.getElementById('mode-heat');
+
+    if (modeOffBtn && modeOffBtn.classList.contains('active')) {
+      optimizationMode = 'off';
+    } else if (modeCoolBtn && modeCoolBtn.classList.contains('active')) {
+      optimizationMode = 'cool';
+    } else if (modeHeatBtn && modeHeatBtn.classList.contains('active')) {
+      optimizationMode = 'heat';
+    }
 
     console.log('DEBUG: Basic Settings Form Values:');
     console.log('- homeSize:', homeSize);
@@ -896,9 +906,19 @@ class CurveControlCard extends HTMLElement {
     const timeHome = this.shadowRoot.getElementById('time-home')?.value || "17:00";
     const savingsLevel = parseInt(this.shadowRoot.getElementById('savings-level')?.value || 2);
 
-    // Get current optimization mode
-    const selectEntity = this._hass.states['select.curve_control_optimization_mode'];
-    const optimizationMode = selectEntity ? selectEntity.state : 'cool';
+    // Get current optimization mode directly from active button in DOM
+    let optimizationMode = 'cool'; // default
+    const modeOffBtn = this.shadowRoot.getElementById('mode-off');
+    const modeCoolBtn = this.shadowRoot.getElementById('mode-cool');
+    const modeHeatBtn = this.shadowRoot.getElementById('mode-heat');
+
+    if (modeOffBtn && modeOffBtn.classList.contains('active')) {
+      optimizationMode = 'off';
+    } else if (modeCoolBtn && modeCoolBtn.classList.contains('active')) {
+      optimizationMode = 'cool';
+    } else if (modeHeatBtn && modeHeatBtn.classList.contains('active')) {
+      optimizationMode = 'heat';
+    }
 
     console.log('DEBUG: Custom Schedule Form Values:');
     console.log('- homeSize:', homeSize);
