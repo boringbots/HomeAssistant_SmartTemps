@@ -7,6 +7,7 @@ class CurveControlCard extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this.currentTab = 'display';
     this._listenersSetup = false; // Track if event listeners are already set up
+    this._selectedMode = null; // Track the most recently selected mode (for immediate use before HA state updates)
   }
 
   setConfig(config) {
@@ -416,6 +417,7 @@ class CurveControlCard extends HTMLElement {
     // Add event listeners (only once, regardless of entity state)
     if (modeOffBtn && modeCoolBtn && modeHeatBtn && !this._modeListenersSet) {
       modeOffBtn.addEventListener('click', () => {
+        this._selectedMode = 'off'; // Store immediately for use before HA state updates
         this._hass.callService('select', 'select_option', {
           entity_id: 'select.curve_control_optimization_mode',
           option: 'off'
@@ -423,6 +425,7 @@ class CurveControlCard extends HTMLElement {
       });
 
       modeCoolBtn.addEventListener('click', () => {
+        this._selectedMode = 'cool'; // Store immediately for use before HA state updates
         this._hass.callService('select', 'select_option', {
           entity_id: 'select.curve_control_optimization_mode',
           option: 'cool'
@@ -430,6 +433,7 @@ class CurveControlCard extends HTMLElement {
       });
 
       modeHeatBtn.addEventListener('click', () => {
+        this._selectedMode = 'heat'; // Store immediately for use before HA state updates
         this._hass.callService('select', 'select_option', {
           entity_id: 'select.curve_control_optimization_mode',
           option: 'heat'
@@ -442,6 +446,9 @@ class CurveControlCard extends HTMLElement {
     // Update active button styling based on current state
     if (selectEntity && modeOffBtn && modeCoolBtn && modeHeatBtn) {
       const currentMode = selectEntity.state;
+
+      // Sync our stored mode with the entity state (in case it was changed externally)
+      this._selectedMode = currentMode;
 
       // Clear all active states first
       modeOffBtn.classList.remove('active');
@@ -859,18 +866,25 @@ class CurveControlCard extends HTMLElement {
     const timeHome = this.shadowRoot.getElementById('time-home').value;
     const savingsLevel = parseInt(this.shadowRoot.getElementById('savings-level').value);
 
-    // Get current optimization mode directly from active button in DOM
+    // Get current optimization mode - prioritize recently clicked button, then DOM state, then entity state
     let optimizationMode = 'cool'; // default
-    const modeOffBtn = this.shadowRoot.getElementById('mode-off');
-    const modeCoolBtn = this.shadowRoot.getElementById('mode-cool');
-    const modeHeatBtn = this.shadowRoot.getElementById('mode-heat');
 
-    if (modeOffBtn && modeOffBtn.classList.contains('active')) {
-      optimizationMode = 'off';
-    } else if (modeCoolBtn && modeCoolBtn.classList.contains('active')) {
-      optimizationMode = 'cool';
-    } else if (modeHeatBtn && modeHeatBtn.classList.contains('active')) {
-      optimizationMode = 'heat';
+    if (this._selectedMode) {
+      // Use the mode from the most recently clicked button (immediate, before HA state updates)
+      optimizationMode = this._selectedMode;
+    } else {
+      // Fall back to checking DOM button state
+      const modeOffBtn = this.shadowRoot.getElementById('mode-off');
+      const modeCoolBtn = this.shadowRoot.getElementById('mode-cool');
+      const modeHeatBtn = this.shadowRoot.getElementById('mode-heat');
+
+      if (modeOffBtn && modeOffBtn.classList.contains('active')) {
+        optimizationMode = 'off';
+      } else if (modeCoolBtn && modeCoolBtn.classList.contains('active')) {
+        optimizationMode = 'cool';
+      } else if (modeHeatBtn && modeHeatBtn.classList.contains('active')) {
+        optimizationMode = 'heat';
+      }
     }
 
     console.log('DEBUG: Basic Settings Form Values:');
@@ -906,18 +920,25 @@ class CurveControlCard extends HTMLElement {
     const timeHome = this.shadowRoot.getElementById('time-home')?.value || "17:00";
     const savingsLevel = parseInt(this.shadowRoot.getElementById('savings-level')?.value || 2);
 
-    // Get current optimization mode directly from active button in DOM
+    // Get current optimization mode - prioritize recently clicked button, then DOM state, then entity state
     let optimizationMode = 'cool'; // default
-    const modeOffBtn = this.shadowRoot.getElementById('mode-off');
-    const modeCoolBtn = this.shadowRoot.getElementById('mode-cool');
-    const modeHeatBtn = this.shadowRoot.getElementById('mode-heat');
 
-    if (modeOffBtn && modeOffBtn.classList.contains('active')) {
-      optimizationMode = 'off';
-    } else if (modeCoolBtn && modeCoolBtn.classList.contains('active')) {
-      optimizationMode = 'cool';
-    } else if (modeHeatBtn && modeHeatBtn.classList.contains('active')) {
-      optimizationMode = 'heat';
+    if (this._selectedMode) {
+      // Use the mode from the most recently clicked button (immediate, before HA state updates)
+      optimizationMode = this._selectedMode;
+    } else {
+      // Fall back to checking DOM button state
+      const modeOffBtn = this.shadowRoot.getElementById('mode-off');
+      const modeCoolBtn = this.shadowRoot.getElementById('mode-cool');
+      const modeHeatBtn = this.shadowRoot.getElementById('mode-heat');
+
+      if (modeOffBtn && modeOffBtn.classList.contains('active')) {
+        optimizationMode = 'off';
+      } else if (modeCoolBtn && modeCoolBtn.classList.contains('active')) {
+        optimizationMode = 'cool';
+      } else if (modeHeatBtn && modeHeatBtn.classList.contains('active')) {
+        optimizationMode = 'heat';
+      }
     }
 
     console.log('DEBUG: Custom Schedule Form Values:');
