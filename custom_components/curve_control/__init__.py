@@ -253,15 +253,18 @@ class CurveControlCoordinator(DataUpdateCoordinator):
         self._schedule_date = None
         self._midnight_listener = None
         self._custom_temperature_schedule = None  # For detailed frontend schedules
-        self.optimization_mode = "cool"  # Optimization mode: 'off', 'cool', or 'heat'
-        
+        self.optimization_mode = "cool"  # Default, will be loaded from database if available
+
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
             update_interval=None,  # Disable automatic polling
         )
-        
+
+        # Load saved optimization mode from database
+        hass.async_create_task(self._load_saved_preferences())
+
         # Set up midnight optimization
         self._setup_midnight_optimization()
     
@@ -284,6 +287,47 @@ class CurveControlCoordinator(DataUpdateCoordinator):
         """Handle midnight optimization trigger."""
         _LOGGER.info("Running scheduled midnight optimization")
         await self.async_request_refresh()
+
+    async def _load_saved_preferences(self) -> None:
+        """Load user's saved preferences including optimization_mode from database."""
+        if not self.user_id:
+            _LOGGER.debug("Cannot load saved preferences - no user_id")
+            return
+
+        try:
+            # Fetch the most recent preferences from Supabase
+            async with async_timeout.timeout(10):
+                # Query the user_optimization_daily table for the most recent entry
+                from datetime import datetime
+                today = datetime.now().date().isoformat()
+
+                response = await self.session.get(
+                    f"{self.supabase_url}/rest/v1/user_optimization_daily",
+                    params={
+                        "user_id": f"eq.{self.user_id}",
+                        "select": "optimization_mode",
+                        "order": "date.desc",
+                        "limit": "1",
+                    },
+                    headers={
+                        "apikey": DEFAULT_SUPABASE_ANON_KEY,
+                        "Authorization": f"Bearer {DEFAULT_SUPABASE_ANON_KEY}",
+                    },
+                )
+
+                if response.status == 200:
+                    data = await response.json()
+                    if data and len(data) > 0 and data[0].get("optimization_mode"):
+                        saved_mode = data[0]["optimization_mode"]
+                        self.optimization_mode = saved_mode
+                        _LOGGER.info(f"Loaded saved optimization mode: {saved_mode}")
+                    else:
+                        _LOGGER.debug("No saved optimization mode found, using default 'cool'")
+                else:
+                    _LOGGER.debug(f"Could not fetch saved preferences: HTTP {response.status}")
+
+        except Exception as err:
+            _LOGGER.debug(f"Error loading saved preferences: {err}")
 
     async def _async_fetch_thermal_rates_from_backend(self) -> None:
         """Fetch thermal rates from Supabase backend."""
